@@ -1,6 +1,6 @@
 module ActiveRecord
-  module Acts
-    module TaggableOn
+  module Is
+    module Taggable
       def self.included(base)
         base.extend(ClassMethods)
       end
@@ -10,19 +10,17 @@ module ActiveRecord
           false
         end
         
-        def acts_as_taggable
-          acts_as_taggable_on :tags
+        def is_taggable
+          is_taggable :tags
         end
         
-        def acts_as_taggable_on(*args)
+        def is_taggable(*args)
           args.flatten! if args
           args.compact! if args
           for tag_type in args
             tag_type = tag_type.to_s
             self.class_eval do
-              has_many "#{tag_type.singularize}_taggings".to_sym, :as => :taggable, :dependent => :destroy, 
-                :include => :tag, :conditions => ["context = ?",tag_type], :class_name => "Tagging"
-              has_many "#{tag_type}".to_sym, :through => "#{tag_type.singularize}_taggings".to_sym, :source => :tag
+              has_many "#{tag_type.singularize}_taggings".to_sym, :as => :taggable, :dependent => :destroy, :conditions => ["context = ?",tag_type], :class_name => "Tagging"
             end
             
             self.class_eval <<-RUBY
@@ -72,8 +70,7 @@ module ActiveRecord
               write_inheritable_attribute(:tag_types, args.uniq)
               class_inheritable_reader :tag_types
             
-              has_many :taggings, :as => :taggable, :dependent => :destroy, :include => :tag
-              has_many :base_tags, :class_name => "Tag", :through => :taggings, :source => :tag
+              has_many :taggings, :as => :taggable, :dependent => :destroy
             
               attr_writer :custom_contexts
             
@@ -87,8 +84,8 @@ module ActiveRecord
               end
             end
             
-            include ActiveRecord::Acts::TaggableOn::InstanceMethods
-            extend ActiveRecord::Acts::TaggableOn::SingletonMethods                
+            include ActiveRecord::Is::Taggable::InstanceMethods
+            extend  ActiveRecord::Is::Taggable::SingletonMethods                
             alias_method_chain :reload, :tag_list
           end
         end
@@ -116,7 +113,7 @@ module ActiveRecord
         end     
         
         def tag_counts_on(context, options = {})
-          Tag.find(:all, find_options_for_tag_counts(options.merge({:on => context.to_s})))
+          Tagging.find(:all, find_options_for_tag_counts(options.merge({:on => context.to_s})))
         end           
         
         def find_options_for_find_tagged_with(tags, options = {})
@@ -131,10 +128,10 @@ module ActiveRecord
             conditions << sanitize_sql(["context = ?",on.to_s])
           end
 
-          taggings_alias, tags_alias = "#{table_name}_taggings", "#{table_name}_tags"
+          taggings_alias = "#{table_name}_taggings"
 
           if options.delete(:exclude)
-            tags_conditions = tags.map { |t| sanitize_sql(["#{Tag.table_name}.name LIKE ?", t]) }.join(" OR ")
+            tags_conditions = tags.map { |t| sanitize_sql(["#{Tagging.table_name}.tag LIKE ?", t]) }.join(" OR ")
             conditions << sanitize_sql(["#{table_name}.id NOT IN (SELECT #{Tagging.table_name}.taggable_id FROM #{Tagging.table_name} LEFT OUTER JOIN #{Tag.table_name} ON #{Tagging.table_name}.tag_id = #{Tag.table_name}.id WHERE (#{tags_conditions}) AND #{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)})", tags])
           else
             conditions << tags.map { |t| sanitize_sql(["#{tags_alias}.name LIKE ?", t]) }.join(" OR ")
@@ -237,8 +234,7 @@ module ActiveRecord
         
         def tags_on(context, owner=nil)
           if owner
-            opts = {:conditions => ["context = ? AND tagger_id = ? AND tagger_type = ?",
-                                    context.to_s, owner.id, owner.class.to_s]}
+            opts = {:conditions => ["context = ? AND tagger_id = ? AND tagger_type = ?", context.to_s, owner.id, owner.class.to_s]}
           else
             opts = {:conditions => ["context = ?", context.to_s]}
           end
