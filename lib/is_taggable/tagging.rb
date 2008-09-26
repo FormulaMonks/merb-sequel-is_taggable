@@ -1,4 +1,5 @@
 class Tagging < ActiveRecord::Base #:nodoc:
+  include XssTerminate
   belongs_to :taggable, :polymorphic => true
   belongs_to :tagger, :polymorphic => true
   
