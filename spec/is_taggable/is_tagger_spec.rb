@@ -1,6 +1,6 @@
 require File.dirname(__FILE__) + '/../spec_helper'
 
-describe "acts_as_tagger" do
+describe "is_tagger" do
   context "Tagger Method Generation" do
 
     before(:each) do

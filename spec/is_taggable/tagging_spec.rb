@@ -1,11 +1,10 @@
 require File.dirname(__FILE__) + '/../spec_helper'
 
-describe Tag do
+describe Tagging do
   before(:each) do
-    @tag = Tag.new
-    @user = TaggableModel.create(:name => "Pablo")  
+    @tagging = Tagging.new
   end
-  
+
   it "should require a name" do
     @tag.should have(1).errors_on(:name)
     @tag.name = "something"
