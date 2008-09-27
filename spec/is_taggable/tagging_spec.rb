@@ -20,4 +20,9 @@ describe Tagging do
     @tagging.tag = "cool"
     @tagging.to_s.should == "cool"
   end
+  
+  it "should raise if you try to save one even when it's valid" do
+    @tagging.tag = 'foo'
+    lambda { @tagging.save }.should raise_error
+  end
 end

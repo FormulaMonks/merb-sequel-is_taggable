@@ -1,5 +1,4 @@
 class Tagging < ActiveRecord::Base #:nodoc:
-  include XssTerminate
   belongs_to :taggable, :polymorphic => true
   belongs_to :tagger, :polymorphic => true
   
@@ -25,5 +24,9 @@ class Tagging < ActiveRecord::Base #:nodoc:
   
   def count
     read_attribute(:count).to_i
+  end
+  
+  def save
+    raise "Taggings are protected from being created individually, please use the tagging methods on Taggable objects"
   end
 end

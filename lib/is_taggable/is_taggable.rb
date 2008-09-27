@@ -245,8 +245,12 @@ module ActiveRecord
           else
             opts = {:conditions => ["context = ?", context.to_s]}
           end
+<<<<<<< HEAD:lib/is_taggable/is_taggable.rb
           # base_tags.find(:all, opts)
           Tagging.find(:all, opts)
+=======
+          taggings.find(:all, opts)
+>>>>>>> opimtized save_tags in is_taggable and protected tagging#save:lib/is_taggable/is_taggable.rb
         end
 
         def cached_tag_list_on(context)
@@ -288,39 +292,18 @@ module ActiveRecord
         end
 
         def save_tags
-          (custom_contexts + self.class.tag_types.map(&:to_s)).each do |tag_type|
-            next unless tag_list = instance_variable_get("@#{tag_type.singularize}_list")
-            owner = tag_list.owner
-            new_tags = tag_list - taggings_on(tag_type).map(&:tag)
-            old_tags = taggings_on(tag_type).reject { |tagging| tag_list.include?(tagging.tag) }
-
-            self.class.transaction do
-              Tagging.delete(*old_tags) if old_tags.any?
-              new_tags.each do |new_tag|
-                Tagging.create!(:tag => new_tag, :context => tag_type,
-                               :taggable => self, :tagger => owner)
-              end
-            end
-          end
-
-          true
-        end
-
-        def save_tags
+          all_taggings = Hash[*(self.taggings.find(:all, :order => 'context ASC').collect{ |tagging| [ tagging.context, tagging ] }).flatten]
           (custom_contexts + self.class.tag_types.map(&:to_s)).each do |tag_type|
             next unless contextual_tag_list = instance_variable_get("@#{tag_type.singularize}_list")
             owner = contextual_tag_list.owner
-            new_tags = contextual_tag_list - taggings_on(tag_type).map(&:tag)
-            old_tags = taggings_on(tag_type).reject { |tagging| contextual_tag_list.include?(tagging.tag) }
-
+            existing_taggings = all_taggings[tag_type] || []
+            new_tag_names = contextual_tag_list - existing_taggings.map(&:tag)
+            old_tags = existing_taggings.reject { |tagging| contextual_tag_list.include?(tagging.tag) }
+          
             self.class.transaction do
-              Tagging.delete(old_tags) if old_tags.any?
-              sql = "INSERT INTO taggings (tag, context, taggable_id, taggable_type, created_at) VALUES "
-              values_template = "(?, ?, ?, ?, ?)"
-              sql << new_tags.collect do |tag|
-                sanitize_sql [values_template, tag, tag_type, self.id, self.class.to_s, Time.now.utc.to_s(:db)]
-              end.join(', ')
-              puts sql.inspect
+              self.taggings.delete(*old_tags) if old_tags.any?
+              sql  = "INSERT INTO taggings (tag, context, taggable_id, taggable_type, tagger_id, tagger_type, created_at) VALUES "
+              sql += new_tag_names.collect { |tag| tag_insert_value(tag, tag_type, self, owner) }.join(", ")
               ActiveRecord::Base.connection.execute(sql)
             end
           end
@@ -328,11 +311,22 @@ module ActiveRecord
           true
         end
 
-        def sanitize_sql attrs
+        def sanitize_sql(attrs)
           ActiveRecord::Base.send(:sanitize_sql, attrs)
         end
-
-
+        
+        def tag_insert_value(tag, type, taggable, owner=nil)
+          sanitize_sql(["(?, ?, ?, ?, ?, ?, ?)", 
+            tag, 
+            type, 
+            taggable.id, 
+            taggable.class.to_s, 
+            owner ? owner.id : nil, 
+            owner ? owner.class.to_s : nil, 
+            Time.now.utc.to_s(:db)
+          ])
+        end
+        
         def reload_with_tag_list(*args)
           self.class.tag_types.each do |tag_type|
             self.instance_variable_set("@#{tag_type.to_s.singularize}_list", nil)

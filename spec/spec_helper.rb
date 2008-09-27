@@ -1,7 +1,7 @@
-# require File.dirname(__FILE__) + '/../../../../spec/spec_helper'
+require File.dirname(__FILE__) + '/../../../../spec/spec_helper'
 # hack the require with absolute path like this for now...
 # require '/Users/benalavi/Sites/causecast/spec/spec_helper'
-require '/Users/michel/CitrusByte/causecast/spec/spec_helper'
+# require '/Users/michel/CitrusByte/causecast/spec/spec_helper'
 
 module Spec::Example::ExampleGroupMethods
   alias :context :describe
