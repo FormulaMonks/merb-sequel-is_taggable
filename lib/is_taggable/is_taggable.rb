@@ -270,9 +270,9 @@ module ActiveRecord
         def related_search_options(context, klass, options = {})
           tags_to_find = self.taggings_on(context).collect { |t| t.tag }
 
-          { :select     => "#{klass.table_name}.*, COUNT(#{Tag.table_name}.id) AS count",
-            :from       => "#{klass.table_name}, #{Tag.table_name}, #{Tagging.table_name}",
-            :conditions => ["#{klass.table_name}.id = #{Tagging.table_name}.taggable_id AND #{Tagging.table_name}.taggable_type = '#{klass.to_s}' AND #{Tagging.table_name}.tag_id = #{Tag.table_name}.id AND #{Tag.table_name}.name IN (?)", tags_to_find],
+          { :select     => "#{klass.table_name}.*, COUNT(#{Tagging.table_name}.id) AS count",
+            :from       => "#{klass.table_name}, #{Tagging.table_name}",
+            :conditions => ["#{klass.table_name}.id = #{Tagging.table_name}.taggable_id AND #{Tagging.table_name}.taggable_type = '#{klass.to_s}' AND #{Tagging.table_name}.context = '#{context}' AND #{Tagging.table_name}.tag IN (?)", tags_to_find],
             :group      => "#{klass.table_name}.id",
             :order      => "count DESC"
           }.update(options)
@@ -294,7 +294,7 @@ module ActiveRecord
             existing_taggings = all_taggings[tag_type] || []
             new_tag_names = contextual_tag_list - existing_taggings.map(&:tag)
             old_tags = existing_taggings.reject { |tagging| contextual_tag_list.include?(tagging.tag) }
-          
+
             self.class.transaction do
               self.taggings.delete(*old_tags) if old_tags.any?
               sql  = "INSERT INTO taggings (tag, context, taggable_id, taggable_type, tagger_id, tagger_type, created_at) VALUES "
@@ -306,22 +306,22 @@ module ActiveRecord
           true
         end
 
-        def sanitize_sql(attrs)
+        def sanitize_sql attrs
           ActiveRecord::Base.send(:sanitize_sql, attrs)
         end
-        
+
         def tag_insert_value(tag, type, taggable, owner=nil)
-          sanitize_sql(["(?, ?, ?, ?, ?, ?, ?)", 
-            tag, 
-            type, 
-            taggable.id, 
-            taggable.class.to_s, 
-            owner ? owner.id : nil, 
-            owner ? owner.class.to_s : nil, 
+          sanitize_sql(["(?, ?, ?, ?, ?, ?, ?)",
+            tag,
+            type,
+            taggable.id,
+            taggable.class.to_s,
+            owner ? owner.id : nil,
+            owner ? owner.class.to_s : nil,
             Time.now.utc.to_s(:db)
           ])
         end
-        
+
         def reload_with_tag_list(*args)
           self.class.tag_types.each do |tag_type|
             self.instance_variable_set("@#{tag_type.to_s.singularize}_list", nil)

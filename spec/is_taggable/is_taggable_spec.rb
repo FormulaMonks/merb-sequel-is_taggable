@@ -88,6 +88,8 @@ describe "Is Taggable" do
       taggable3.tag_list = "one, four"
       taggable3.save
 
+      debugger
+
       taggable1.find_related_tags.should include(taggable3)
       taggable1.find_related_tags.should_not include(taggable2)
     end
