@@ -125,29 +125,24 @@ describe "Is Taggable" do
     end
 
     it 'should eliminate duplicate tagging contexts ' do
-      TaggableModel.acts_as_taggable_on(:skills, :skills)
+      TaggableModel.is_taggable(:skills, :skills)
       TaggableModel.tag_types.freq[:skills].should_not == 3
     end
 
     it "should not contain embedded/nested arrays" do
-      TaggableModel.acts_as_taggable_on([:array], [:array])
+      TaggableModel.is_taggable([:array], [:array])
       TaggableModel.tag_types.freq[[:array]].should == 0
     end
 
     it "should _flatten_ the content of arrays" do
-      TaggableModel.acts_as_taggable_on([:array], [:array])
+      TaggableModel.is_taggable([:array], [:array])
       TaggableModel.tag_types.freq[:array].should == 1
     end
 
-    it "should not raise an error when passed nil" do
-      lambda {
-        TaggableModel.acts_as_taggable_on()
-      }.should_not raise_error
-    end
 
     it "should not raise an error when passed [nil]" do
       lambda {
-        TaggableModel.acts_as_taggable_on([nil])
+        TaggableModel.is_taggable([nil])
       }.should_not raise_error
     end
 
