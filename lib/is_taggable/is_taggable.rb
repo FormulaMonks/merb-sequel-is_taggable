@@ -173,7 +173,8 @@ module ActiveRecord
           start_at = sanitize_sql(["#{Tagging.table_name}.created_at >= ?", options.delete(:start_at)]) if options[:start_at]
           end_at = sanitize_sql(["#{Tagging.table_name}.created_at <= ?", options.delete(:end_at)]) if options[:end_at]
 
-          type_and_context = "#{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)}"
+          type_and_context = "#{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)}"          
+          type_and_context << sanitize_sql(["AND #{Tagging.table_name}.context = ?", options.delete(:on).to_s]) unless options[:on].nil?
 
           conditions = [
             type_and_context,
@@ -185,9 +186,7 @@ module ActiveRecord
           conditions = conditions.compact.join(' AND ')
           conditions = merge_conditions(conditions, scope[:conditions]) if scope
 
-          joins = ["LEFT OUTER JOIN #{Tagging.table_name} ON #{Tag.table_name}.id = #{Tagging.table_name}.tag_id"]
-          joins << sanitize_sql(["AND #{Tagging.table_name}.context = ?",options.delete(:on).to_s]) unless options[:on].nil?
-          joins << "LEFT OUTER JOIN #{table_name} ON #{table_name}.#{primary_key} = #{Tagging.table_name}.taggable_id"
+          joins = ["LEFT OUTER JOIN #{table_name} ON #{table_name}.#{primary_key} = #{Tagging.table_name}.taggable_id"]
           joins << scope[:joins] if scope && scope[:joins]
 
           at_least  = sanitize_sql(['COUNT(*) >= ?', options.delete(:at_least)]) if options[:at_least]
