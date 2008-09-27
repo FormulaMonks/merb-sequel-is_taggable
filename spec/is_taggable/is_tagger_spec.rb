@@ -28,7 +28,7 @@ describe "is_tagger" do
     end
     
     it "should generate an association for #owned_taggings and #owned_tags" do
-      @tagger.should respond_to(:owned_taggings, :owned_tags)
+      @tagger.should respond_to(:owned_taggings)
     end
   end
   
