@@ -11,7 +11,7 @@ describe "Taggable" do
     @taggable.instance_variable_get("@skill_list").instance_of?(TagList).should be_true
     @taggable.save
     
-    Tag.find(:all).size.should == 3
+    Tagging.find(:all).size.should == 3
   end
   
   it "should be able to create tags through the tag list directly" do
@@ -69,7 +69,7 @@ describe "Taggable" do
     bob = TaggableModel.create(:name => "Bob", :tag_list => "ruby")
     frank = TaggableModel.create(:name => "Frank", :tag_list => "Ruby")
     
-    Tag.find(:all).size.should == 1
+    Tagging.find(:all).size.should == 1
     TaggableModel.find_tagged_with("ruby").should == TaggableModel.find_tagged_with("Ruby")
   end
   
@@ -95,7 +95,7 @@ describe "Taggable" do
     bob.tag_list_on(:rotors).should == ["spinning","jumping"]
     bob.save
     bob.reload
-    bob.tags_on(:rotors).should_not be_empty
+    bob.taggings_on(:rotors).should_not be_empty
   end
   
   it "should be able to find tagged on a custom tag context" do
