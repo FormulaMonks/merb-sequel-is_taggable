@@ -245,12 +245,7 @@ module ActiveRecord
           else
             opts = {:conditions => ["context = ?", context.to_s]}
           end
-<<<<<<< HEAD:lib/is_taggable/is_taggable.rb
-          # base_tags.find(:all, opts)
-          Tagging.find(:all, opts)
-=======
           taggings.find(:all, opts)
->>>>>>> opimtized save_tags in is_taggable and protected tagging#save:lib/is_taggable/is_taggable.rb
         end
 
         def cached_tag_list_on(context)
