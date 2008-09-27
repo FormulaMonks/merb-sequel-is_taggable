@@ -139,18 +139,17 @@ module ActiveRecord
 
           if options.delete(:exclude)
             tags_conditions = tags.map { |t| sanitize_sql(["#{Tagging.table_name}.tag LIKE ?", t]) }.join(" OR ")
-            conditions << sanitize_sql(["#{table_name}.id NOT IN (SELECT #{Tagging.table_name}.taggable_id FROM #{Tagging.table_name} LEFT OUTER JOIN #{Tag.table_name} ON #{Tagging.table_name}.tag_id = #{Tag.table_name}.id WHERE (#{tags_conditions}) AND #{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)})", tags])
+            conditions << sanitize_sql(["#{table_name}.id NOT IN (SELECT #{Tagging.table_name}.taggable_id FROM #{Tagging.table_name} WHERE (#{tags_conditions}) AND #{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)})", tags])
           else
-            conditions << tags.map { |t| sanitize_sql(["#{tags_alias}.name LIKE ?", t]) }.join(" OR ")
+            conditions << tags.map { |t| sanitize_sql(["#{taggings_alias}.tag LIKE ?", t]) }.join(" OR ")
 
             if options.delete(:match_all)
-              group = "#{taggings_alias}.taggable_id HAVING COUNT(#{taggings_alias}.taggable_id) = #{tags.size}"
+              group = "#{taggings_alias}.taggable_id HAVING COUNT(#{taggings_alias}.taggable_id) = #{taggings.size}"
             end
           end
 
-          { :select => "DISTINCT #{table_name}.*",
-            :joins => "LEFT OUTER JOIN #{Tagging.table_name} #{taggings_alias} ON #{taggings_alias}.taggable_id = #{table_name}.#{primary_key} AND #{taggings_alias}.taggable_type = #{quote_value(base_class.name)} " +
-                      "LEFT OUTER JOIN #{Tag.table_name} #{tags_alias} ON #{tags_alias}.id = #{taggings_alias}.tag_id",
+          { :select     => "DISTINCT #{table_name}.*",
+            :joins      => "LEFT OUTER JOIN #{Tagging.table_name} #{taggings_alias} ON #{taggings_alias}.taggable_id = #{table_name}.#{primary_key} AND #{taggings_alias}.taggable_type = #{quote_value(base_class.name)}",
             :conditions => conditions.join(" AND "),
             :group      => group
           }.update(options)
@@ -194,10 +193,10 @@ module ActiveRecord
           at_least  = sanitize_sql(['COUNT(*) >= ?', options.delete(:at_least)]) if options[:at_least]
           at_most   = sanitize_sql(['COUNT(*) <= ?', options.delete(:at_most)]) if options[:at_most]
           having    = [at_least, at_most].compact.join(' AND ')
-          group_by  = "#{Tag.table_name}.id, #{Tag.table_name}.name HAVING COUNT(*) > 0"
+          group_by  = "#{Tagging.table_name}.id, #{Tagging.table_name}.tag HAVING COUNT(*) > 0"
           group_by << " AND #{having}" unless having.blank?
 
-          { :select     => "#{Tag.table_name}.id, #{Tag.table_name}.name, COUNT(*) AS count",
+          { :select     => "#{Tagging.table_name}.id, #{Tagging.table_name}.tag, COUNT(*) AS count",
             :joins      => joins.join(" "),
             :conditions => conditions,
             :group      => group_by
@@ -258,7 +257,7 @@ module ActiveRecord
         end
 
         def tag_counts_on(context,options={})
-          self.class.tag_counts_on(context,{:conditions => ["#{Tag.table_name}.name IN (?)", tag_list_on(context)]}.reverse_merge!(options))
+          self.class.tag_counts_on(context,{:conditions => ["#{Tagging.table_name}.tag IN (?)", tag_list_on(context)]}.reverse_merge!(options))
         end
 
         def related_tags_for(context, klass, options = {})
