@@ -320,7 +320,7 @@ module ActiveRecord
             tag,
             type,
             taggable.id,
-            taggable.class.to_s,
+            taggable.class.base_class.to_s, # base_class to support STI properly
             owner ? owner.id : nil,
             owner ? owner.class.to_s : nil,
             Time.now.utc.to_s(:db)
