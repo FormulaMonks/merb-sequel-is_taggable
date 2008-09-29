@@ -172,18 +172,18 @@ module ActiveRecord
           scope = scope(:find)
           start_at = sanitize_sql(["#{Tagging.table_name}.created_at >= ?", options.delete(:start_at)]) if options[:start_at]
           end_at = sanitize_sql(["#{Tagging.table_name}.created_at <= ?", options.delete(:end_at)]) if options[:end_at]
-
-          type_and_context = "#{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)}"          
+          
+          type_and_context = "#{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)}"
           type_and_context << sanitize_sql(["AND #{Tagging.table_name}.context = ?", options.delete(:on).to_s]) unless options[:on].nil?
-
+          
           conditions = [
             type_and_context,
-            options[:conditions],
             start_at,
             end_at
           ]
 
           conditions = conditions.compact.join(' AND ')
+          conditions = merge_conditions(conditions, options.delete(:conditions)) if options[:conditions]
           conditions = merge_conditions(conditions, scope[:conditions]) if scope
 
           joins = ["LEFT OUTER JOIN #{table_name} ON #{table_name}.#{primary_key} = #{Tagging.table_name}.taggable_id"]
@@ -192,10 +192,10 @@ module ActiveRecord
           at_least  = sanitize_sql(['COUNT(*) >= ?', options.delete(:at_least)]) if options[:at_least]
           at_most   = sanitize_sql(['COUNT(*) <= ?', options.delete(:at_most)]) if options[:at_most]
           having    = [at_least, at_most].compact.join(' AND ')
-          group_by  = "#{Tagging.table_name}.id, #{Tagging.table_name}.tag HAVING COUNT(*) > 0"
+          group_by  = "#{Tagging.table_name}.tag HAVING COUNT(*) > 0"
           group_by << " AND #{having}" unless having.blank?
-
-          { :select     => "#{Tagging.table_name}.id, #{Tagging.table_name}.tag, COUNT(*) AS count",
+          
+          { :select     => "#{Tagging.table_name}.tag, COUNT(*) AS count",
             :joins      => joins.join(" "),
             :conditions => conditions,
             :group      => group_by
@@ -285,19 +285,26 @@ module ActiveRecord
         end
 
         def save_tags
-          all_taggings = Hash[*(self.taggings.find(:all, :order => 'context ASC').collect{ |tagging| [ tagging.context, tagging ] }).flatten]
+          all_taggings = {}
+          self.taggings.find(:all, :order => 'context ASC').each do |tagging|
+            all_taggings[tagging.context] ||= []
+            all_taggings[tagging.context] << tagging
+          end
+          
           (custom_contexts + self.class.tag_types.map(&:to_s)).each do |tag_type|
             next unless contextual_tag_list = instance_variable_get("@#{tag_type.singularize}_list")
             owner = contextual_tag_list.owner
-            existing_taggings = all_taggings[tag_type] || []
+            existing_taggings = all_taggings[tag_type.to_sym] || []
             new_tag_names = contextual_tag_list - existing_taggings.map(&:tag)
             old_tags = existing_taggings.reject { |tagging| contextual_tag_list.include?(tagging.tag) }
 
             self.class.transaction do
               self.taggings.delete(*old_tags) if old_tags.any?
-              sql  = "INSERT INTO taggings (tag, context, taggable_id, taggable_type, tagger_id, tagger_type, created_at) VALUES "
-              sql += new_tag_names.collect { |tag| tag_insert_value(tag, tag_type, self, owner) }.join(", ")
-              ActiveRecord::Base.connection.execute(sql)
+              if new_tag_names.any? # it's possible we're just removing existing tags
+                sql  = "INSERT INTO taggings (tag, context, taggable_id, taggable_type, tagger_id, tagger_type, created_at) VALUES "
+                sql += new_tag_names.collect { |tag| tag_insert_value(tag, tag_type, self, owner) }.join(", ")
+                ActiveRecord::Base.connection.execute(sql)
+              end
             end
           end
 

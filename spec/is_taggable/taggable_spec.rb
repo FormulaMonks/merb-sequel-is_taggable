@@ -69,7 +69,7 @@ describe "Taggable" do
     bob = TaggableModel.create(:name => "Bob", :tag_list => "ruby")
     frank = TaggableModel.create(:name => "Frank", :tag_list => "Ruby")
     
-    Tagging.find(:all).size.should == 1
+    Tagging.find(:all).size.should == 2
     TaggableModel.find_tagged_with("ruby").should == TaggableModel.find_tagged_with("Ruby")
   end
   
@@ -85,8 +85,8 @@ describe "Taggable" do
     bob = TaggableModel.create(:name => "Bob", :tag_list => "ruby, rails, css")
     frank = TaggableModel.create(:name => "Frank", :tag_list => "ruby, rails")
     charlie = TaggableModel.create(:name => "Charlie", :skill_list => "ruby")
-    bob.tag_counts.first.count.should == 2
-    charlie.skill_counts.first.count.should == 1
+    bob.tag_counts.collect{ |t| t.count }.sort.should eql([1, 2, 2])
+    charlie.skill_counts.collect{ |t| t.count }.sort.should eql([1])
   end
   
   it "should be able to set a custom tag context list" do
