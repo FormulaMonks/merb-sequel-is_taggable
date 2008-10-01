@@ -112,7 +112,25 @@ describe "Is Taggable" do
       taggable1.find_related_tags_for(OtherTaggableModel).should_not include(taggable2)
     end
   end
+  
+  describe "when setting tags" do
+    before :each do
+      @taggable = TaggableModel.create!(:name => 'foo')
+    end
+    
+    it "should be settable through through tag_list=" do
+      @taggable.tag_list = 'foo, bar, baz'
+      @taggable.save
+      @taggable.reload.tags.should include('foo', 'bar', 'baz')
+    end
 
+    it "should be settable through through tags=" do
+      @taggable.tags = %w(foo bar baz)
+      @taggable.save
+      @taggable.reload.tags.should include('foo', 'bar', 'baz')
+    end
+  end
+  
   describe 'Tagging Contexts' do
     before(:all) do
       class Array

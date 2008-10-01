@@ -93,6 +93,12 @@ class TagList < Array
         taglist.owner = owner
       end
     end
+
+    def new_from_owner(owner, *tags)
+      returning new(*tags) do |taglist|
+        taglist.owner = owner
+      end
+    end
     
     def normalize(tag)
       tag.gsub(/\s+/, ' ').to_ascii.downcase.gsub(/[^a-z0-9\-\s]/, '')

@@ -44,11 +44,12 @@ module ActiveRecord
                 tag_list_on('#{tag_type}')
               end
 
-              def #{tag_type}=
+              def #{tag_type}=(tags)
+                set_tags_on('#{tag_type}', tags)
               end
 
               def #{tag_type.singularize}_list=(new_tags)
-                set_tag_list_on('#{tag_type}',new_tags)
+                set_tag_list_on('#{tag_type}', new_tags)
               end
 
               def #{tag_type.singularize}_counts(options = {})
@@ -257,6 +258,11 @@ module ActiveRecord
 
         def set_tag_list_on(context,new_list, tagger=nil)
           instance_variable_set("@#{context.to_s.singularize}_list", TagList.from_owner(tagger, new_list))
+          add_custom_context(context)
+        end
+        
+        def set_tags_on(context, new_tags, tagger=nil)
+          instance_variable_set("@#{context.to_s.singularize}_list", TagList.new_from_owner(tagger, *new_tags))
           add_custom_context(context)
         end
 
