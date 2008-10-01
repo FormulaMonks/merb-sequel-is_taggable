@@ -138,10 +138,9 @@ module ActiveRecord
           taggings_alias = "#{table_name}_taggings"
 
           if options.delete(:exclude)
-            tags_conditions = tags.map { |t| sanitize_sql(["#{Tagging.table_name}.tag LIKE ?", t]) }.join(" OR ")
-            conditions << sanitize_sql(["#{table_name}.id NOT IN (SELECT #{Tagging.table_name}.taggable_id FROM #{Tagging.table_name} WHERE (#{tags_conditions}) AND #{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)})", tags])
+            conditions << sanitize_sql(["#{table_name}.id NOT IN (SELECT #{Tagging.table_name}.taggable_id FROM #{Tagging.table_name} WHERE (#{Tagging.table_name}.normalized IN(?)) AND #{Tagging.table_name}.taggable_type = #{quote_value(base_class.name)})", tags.normalized])
           else
-            conditions << tags.map { |t| sanitize_sql(["#{taggings_alias}.tag LIKE ?", t]) }.join(" OR ")
+            conditions << sanitize_sql(["#{taggings_alias}.normalized IN(?)", tags.normalized])
 
             if options.delete(:match_all)
               group = "#{taggings_alias}.taggable_id HAVING COUNT(#{taggings_alias}.taggable_id) = #{taggings.size}"
@@ -192,7 +191,13 @@ module ActiveRecord
           at_least  = sanitize_sql(['COUNT(*) >= ?', options.delete(:at_least)]) if options[:at_least]
           at_most   = sanitize_sql(['COUNT(*) <= ?', options.delete(:at_most)]) if options[:at_most]
           having    = [at_least, at_most].compact.join(' AND ')
-          group_by  = "#{Tagging.table_name}.tag HAVING COUNT(*) > 0"
+          
+          # note that it makes sense here to group by both (and allow both to 
+          # be selected) since we're enforcing that tags that normalize to the
+          # same thing can't exist. this means there will never be a case when
+          # one normalized tag has multiple non-normalized representations,
+          # meaning we still have a proper set when grouping by either column
+          group_by  = "#{Tagging.table_name}.normalized, #{Tagging.table_name}.tag HAVING COUNT(*) > 0"
           group_by << " AND #{having}" unless having.blank?
           
           { :select     => "#{Tagging.table_name}.tag, COUNT(*) AS count",
@@ -256,7 +261,7 @@ module ActiveRecord
         end
 
         def tag_counts_on(context,options={})
-          self.class.tag_counts_on(context,{:conditions => ["#{Tagging.table_name}.tag IN (?)", tag_list_on(context)]}.reverse_merge!(options))
+          self.class.tag_counts_on(context,{:conditions => ["#{Tagging.table_name}.normalized IN (?)", tag_list_on(context).normalized]}.reverse_merge!(options))
         end
 
         def related_tags_for(context, klass, options = {})
@@ -266,12 +271,17 @@ module ActiveRecord
         end
 
         def related_search_options(context, klass, options = {})
-          tags_to_find = self.taggings_on(context).collect { |t| t.tag }
+          tags_to_find = self.taggings_on(context).collect(&:normalized)
 
-          { :select     => "#{klass.table_name}.*, COUNT(#{Tagging.table_name}.id) AS count",
-            :from       => "#{klass.table_name}, #{Tagging.table_name}",
-            :conditions => ["#{klass.table_name}.id = #{Tagging.table_name}.taggable_id AND #{Tagging.table_name}.taggable_type = '#{klass.to_s}' AND #{Tagging.table_name}.context = '#{context}' AND #{Tagging.table_name}.tag IN (?)", tags_to_find],
-            :group      => "#{klass.table_name}.id",
+          { :select     => "#{klass.table_name}.*, related_ids.count AS count",
+            :from       => "#{klass.table_name}",
+            :joins      => sanitize_sql(["INNER JOIN(
+              SELECT #{klass.table_name}.id, COUNT(#{Tagging.table_name}.id) AS count
+                FROM #{klass.table_name}, #{Tagging.table_name}
+               WHERE #{klass.table_name}.id = #{Tagging.table_name}.taggable_id AND #{Tagging.table_name}.taggable_type = '#{klass.to_s}'
+                 AND #{Tagging.table_name}.context = '#{context}' AND #{Tagging.table_name}.normalized IN (?)
+               GROUP BY #{klass.table_name}.id
+              ) AS related_ids ON(#{klass.table_name}.id = related_ids.id)", tags_to_find]),
             :order      => "count DESC"
           }.update(options)
         end
@@ -293,15 +303,16 @@ module ActiveRecord
           
           (custom_contexts + self.class.tag_types.map(&:to_s)).each do |tag_type|
             next unless contextual_tag_list = instance_variable_get("@#{tag_type.singularize}_list")
+            normalized_tag_list = contextual_tag_list.normalized
             owner = contextual_tag_list.owner
             existing_taggings = all_taggings[tag_type.to_sym] || []
-            new_tag_names = contextual_tag_list - existing_taggings.map(&:tag)
-            old_tags = existing_taggings.reject { |tagging| contextual_tag_list.include?(tagging.tag) }
+            new_tag_names = normalized_tag_list - existing_taggings.map(&:normalized)
+            old_tags = existing_taggings.reject { |tagging| normalized_tag_list.include?(tagging.normalized) }
 
             self.class.transaction do
               self.taggings.delete(*old_tags) if old_tags.any?
               if new_tag_names.any? # it's possible we're just removing existing tags
-                sql  = "INSERT INTO taggings (tag, context, taggable_id, taggable_type, tagger_id, tagger_type, created_at) VALUES "
+                sql  = "INSERT INTO taggings (tag, normalized, context, taggable_id, taggable_type, tagger_id, tagger_type, created_at) VALUES "
                 sql += new_tag_names.collect { |tag| tag_insert_value(tag, tag_type, self, owner) }.join(", ")
                 ActiveRecord::Base.connection.execute(sql)
               end
@@ -316,8 +327,9 @@ module ActiveRecord
         end
 
         def tag_insert_value(tag, type, taggable, owner=nil)
-          sanitize_sql(["(?, ?, ?, ?, ?, ?, ?)",
+          sanitize_sql(["(?, ?, ?, ?, ?, ?, ?, ?)",
             tag,
+            TagList.normalize(tag),
             type,
             taggable.id,
             taggable.class.base_class.to_s, # base_class to support STI properly

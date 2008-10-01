@@ -47,7 +47,11 @@ class TagList < Array
       name.include?(delimiter) ? "\"#{name}\"" : name
     end.join(delimiter.ends_with?(" ") ? delimiter : "#{delimiter} ")
   end
-
+  
+  def normalized
+    TagList.new(collect{ |tag| self.class.normalize(tag) })
+  end
+  
  private
   # Remove whitespace, duplicates, and blanks.
   def clean!
@@ -66,7 +70,7 @@ class TagList < Array
 
     args.flatten!
   end
-
+  
   class << self
     # Returns a new TagList using the given tag string.
     #
@@ -88,6 +92,10 @@ class TagList < Array
       returning from(*tags) do |taglist|
         taglist.owner = owner
       end
+    end
+    
+    def normalize(tag)
+      tag.gsub(/\s+/, ' ').to_ascii.downcase.gsub(/[^a-z0-9\-\s]/, '')
     end
   end
 end

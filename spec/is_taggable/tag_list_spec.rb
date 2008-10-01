@@ -38,4 +38,26 @@ describe TagList do
     @tag_list.add("cool","rad,bodacious")
     @tag_list.to_s.should == "awesome, radical, cool, \"rad,bodacious\""
   end
+  
+  describe "normalization" do
+    def normalized_tags(tag_list)
+      TagList.from(tag_list).normalized.to_s
+    end
+    
+    it "should lower case all tags" do
+      normalized_tags("COol, BeANs").should eql('cool, beans')
+    end
+        
+    it "should replace accented characters" do
+      normalized_tags("CÕÖl, BÈÄñs").should eql('cool, beans')
+    end
+    
+    it "should compress whitespace" do
+      normalized_tags("        c     o o l,     b     e an      s         ").should eql('c o o l, b e an s')
+    end
+    
+    it "should strip 'special' characters" do
+      normalized_tags('c%!#{*!@\&oo!@l}, #*!#**)#(!@#)bea<>><>}{}:":":ns').should eql('cool, beans')
+    end
+  end
 end

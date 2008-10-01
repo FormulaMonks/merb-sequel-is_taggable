@@ -10,6 +10,11 @@ describe Tagging do
     @tagging.should have(1).errors_on(:tag)
   end
   
+  it "should require a normalized version of the tag" do
+    @tagging.valid?
+    @tagging.should have(1).errors_on(:normalized)
+  end
+  
   it "should be valid with a tag" do
     @tagging.tag = "something"
     @tagging.valid?

@@ -1,6 +1,7 @@
 ActiveRecord::Schema.define :version => 0 do
   create_table "taggings", :force => true do |t|
     t.string   "tag"
+    t.string   "normalized"
     t.string   "context"
     t.integer  "taggable_id",   :limit => 11
     t.string   "taggable_type"
@@ -11,7 +12,7 @@ ActiveRecord::Schema.define :version => 0 do
 
   add_index "taggings", ["tag"], :name => "index_taggings_on_tag"
   add_index "taggings", ["taggable_id", "taggable_type", "context"], :name => "index_taggings_on_taggable_id_and_taggable_type_and_context"
-  add_index "taggings", ["taggable_id", "taggable_type", "context", "tag"], :name => "index_taggings_on_taggable_and_context_and_tag", :uniq => true
+  add_index "taggings", ["taggable_id", "taggable_type", "context", "normalized"], :name => "index_taggings_on_taggable_and_context_and_normalized", :uniq => true
   
   create_table :taggable_models, :force => true do |t|
     t.column :name, :string
